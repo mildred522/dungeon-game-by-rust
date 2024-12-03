@@ -1,6 +1,7 @@
 use std::io::{self};
 use crate::player;
 use crate::monster;
+use crate::rand;
 
 pub struct Game {
     player: player::Player,
@@ -12,14 +13,10 @@ impl Game {
     pub fn new() -> Self {
         Game {
             player: player::Player::new(),
-            monsters: vec![monster::Monster::new("Goblin", 10, 3, "Excarlibur"),monster::Monster::new("Solider", 15, 4, "Helmet")],
-            map: vec![
-                vec!['#', '#', '#', '#', '#'],
-                vec!['#', 'P', '.', '.', '#'],
-                vec!['#', '.', 'M', '.', '#'],
-                vec!['#', '.', '.', 'M', '#'],
-                vec!['#', '#', '#', '#', '#'],
-            ],
+            monsters: vec![monster::Monster::new("Goblin", 10, 3, "Excarlibur"),
+                           monster::Monster::new("Solider", 15, 4, "Helmet"),
+                           monster::Monster::new("Ferris", 10000, 666, "You are faker!")],
+            map: rand::generate_random_map(),
         }
     }
 
@@ -49,32 +46,41 @@ impl Game {
         // 根据输入更新玩家位置
         match input {
             "w" => {
-                if self.player.y > 0 {
-                    self.player.y -= 1;
+                let new_y = if self.player.y > 0 { self.player.y - 1 } else { self.player.y };
+                if self.map[new_y][self.player.x] != '#' {
+                    self.player.y = new_y;
                 } else {
-                    println!("Cannot move up, you're at the top boundary.");
+                    println!("Cannot move up, you're at the top boundary or there's a wall.");
                 }
             }
             "a" => {
-                if self.player.x > 0 {
-                    self.player.x -= 1;
+                let new_x = if self.player.x > 0 { self.player.x - 1 } else { self.player.x };
+                if self.map[self.player.y][new_x] != '#' {
+                    self.player.x = new_x;
                 } else {
-                    println!("Cannot move left, you're at the left boundary.");
+                    println!("Cannot move left, you're at the left boundary or there's a wall.");
                 }
             }
             "s" => {
-                if self.player.y < self.map.len() - 1 {
-                    self.player.y += 1;
+                let new_y = if self.player.y < self.map.len() - 1 { self.player.y + 1 } else { self.player.y };
+                if new_y < self.map.len() && self.map[new_y][self.player.x] != '#' {
+                    self.player.y = new_y;
                 } else {
-                    println!("Cannot move down, you're at the bottom boundary.");
+                    println!("Cannot move down, you're at the bottom boundary or there's a wall.");
                 }
             }
             "d" => {
-                if self.player.x < self.map[0].len() - 1 {
-                    self.player.x += 1;
+                let new_x = if self.player.x < self.map[0].len() - 1 { self.player.x + 1 } else { self.player.x };
+                if new_x < self.map[0].len() && self.map[self.player.y][new_x] != '#' {
+                    self.player.x = new_x;
                 } else {
-                    println!("Cannot move right, you're at the right boundary.");
+                    println!("Cannot move right, you're at the right boundary or there's a wall.");
                 }
+            }
+            "help" => {
+                println!("Sorry to make the bug! Now let's go to next floor. Good luck!");
+                self.go_to_next_floor();
+                return;
             }
             _ => {
                 println!("Invalid move.");
@@ -86,6 +92,13 @@ impl Game {
         if self.map[self.player.y][self.player.x] == 'M' {
             self.check_encounter();
         }
+
+        if self.map[self.player.y][self.player.x] == 'E' {
+            println!("You find the exit! Now go to the next floor.");
+            self.go_to_next_floor();
+            return;
+        }
+
         self.map[self.player.y][self.player.x] = 'P';
 
         // 提示玩家当前坐标
@@ -105,7 +118,7 @@ impl Game {
 
                 // 调用独立的 `battle` 函数，传入 `self.player` 和 `self.monsters[0]` 的可变引用
                 if let Some(monster) = self.monsters.get_mut(0) {
-                    let (player_alive, monster_alive) = Game::battle(&mut self.player, monster);
+                    let (_player_alive, monster_alive) = Game::battle(&mut self.player, monster);
 
                     if !monster_alive {
                         self.map[self.player.y][self.player.x] = '.';
@@ -116,18 +129,16 @@ impl Game {
                         // 然后再移除怪物
                         self.monsters.remove(0);
                     }
-                        
-                    
-
-                    if !player_alive {
-                        println!("Game Over!");
-                        // 你可以在这里添加更多的游戏结束逻辑
-                    }
                 }
             }
         }
     
-
+    
+    fn go_to_next_floor(&mut self) {
+        self.map = rand::generate_random_map();
+        self.player.x = 1;
+        self.player.y = 1;
+    }
     
 
     fn battle(
@@ -152,7 +163,7 @@ impl Game {
             player_health -= monster.attack;
 
             if player_health <= 0 {
-                println!("You have been defeated!");
+                player.health = player_health;
                 return (false, true);
             }
         }
